@@ -4,39 +4,40 @@ using System.Data.SqlClient;
 
 namespace LegacyApp
 {
-    public class ClientRepository
+    public class ClientRepository : Repository<Client>
     {
-        public Client GetById(int id)
+        public ClientRepository()
+            : base(ConfigurationManager.ConnectionStrings["appDatabase"].ConnectionString)
         {
-            Client client = null;
-            var connectionString = ConfigurationManager.ConnectionStrings["appDatabase"].ConnectionString;
+        }
 
-            using (var connection = new SqlConnection(connectionString))
+        protected override Client GetByIdResult(SqlDataReader reader)
+        {
+            return new Client(reader.GetInt32("ClientId"),
+                              reader.GetString("Name"),
+                              (ClientStatus)reader.GetInt32("ClientStatus"),
+                              reader.GetBoolean("HasCreditLimit"),
+                              reader.GetInt32("LimitCoefficient"));
+        }
+
+        protected override SqlCommand BuildGetByIdCommand(int id, SqlConnection connection)
+        {
+            var command = new SqlCommand
             {
-                var command = new SqlCommand
-                {
-                    Connection = connection,
-                    CommandType = CommandType.StoredProcedure,
-                    CommandText = "uspGetClientById"
-                };
+                Connection = connection,
+                CommandType = CommandType.StoredProcedure,
+                CommandText = "uspGetClientById"
+            };
 
-                var parametr = new SqlParameter("@clientId", SqlDbType.Int) { Value = id };
-                command.Parameters.Add(parametr);
-                
-                connection.Open();
-                var reader = command.ExecuteReader(CommandBehavior.CloseConnection);
-                while (reader.Read())
-                {
-                    client = new Client
-                    {
-                        Id = int.Parse(reader["ClientId"].ToString()),
-                        Name = reader["Name"].ToString(),
-                        ClientStatus = (ClientStatus) int.Parse(reader["ClientStatus"].ToString())
-                    };
-                }
-            }
+            var parametr = new SqlParameter("@clientId", SqlDbType.Int) { Value = id };
+            command.Parameters.Add(parametr);
+            return command;
+        }
 
-            return client;
+        protected override SqlCommand BuildAddCommand(Client item, SqlConnection connection)
+        {
+            //TODO...
+            throw new System.NotImplementedException();
         }
     }
 }

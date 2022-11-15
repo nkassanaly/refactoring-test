@@ -4,78 +4,36 @@ namespace LegacyApp
 {
     public class UserService
     {
+        private readonly IClientService _clientService;
+        private readonly IUserCreditService _userCreditService;
+        private readonly IRepository<User> _userRepository;
+
+        public UserService()
+        {
+            //TODO Normally i would use dependency injection here to inject instances of IClientService and IUserCreditService in this constructor. ( IoC principle using DI)
+            //But i am not allowed to modify program.cs, so it's not possible here.
+            _clientService = new ClientService();
+            _userCreditService = new UserCreditService();
+        }
         public bool AddUser(string firname, string surname, string email, DateTime dateOfBirth, int clientId)
         {
-            if (string.IsNullOrEmpty(firname) || string.IsNullOrEmpty(surname))
-            {
-                return false;
-            }
+            bool userAdded = false;
+            var client = _clientService.GetById(clientId);
 
-            if (email.Contains("@") && !email.Contains("."))
-            {
-                return false;
-            }
+            var user = new User(client, dateOfBirth, email, firname, surname);
 
-            var now = DateTime.Now;
-            int age = now.Year - dateOfBirth.Year;
-
-            if (now.Month < dateOfBirth.Month || (now.Month == dateOfBirth.Month && now.Day < dateOfBirth.Day))
+            if (user.IsValid())
             {
-                age--;
-            }
+                var creditLimit = _userCreditService.GetCreditLimit(user);
+                user.SetCreditLimit(creditLimit);
 
-            if (age < 21)
-            {
-                return false;
-            }
-
-            var clientRepository = new ClientRepository();
-            var client = clientRepository.GetById(clientId);
-
-            var user = new User
-            {
-                Client = client,
-                DateOfBirth = dateOfBirth,
-                EmailAddress = email,
-                Firstname = firname,
-                Surname = surname
-            };
-
-            if (client.Name == "VeryImportantClient")
-            {
-                // Skip credit chek
-                user.HasCreditLimit = false;
-            }
-            else if (client.Name == "ImportantClient")
-            {
-                // Do credit check and double credit limit
-                user.HasCreditLimit = true;
-                using (var userCreditService = new UserCreditServiceClient())
+                if (user.CanSave())
                 {
-                    var creditLimit = userCreditService.GetCreditLimit(user.Firstname, user.Surname, user.DateOfBirth);
-                    creditLimit = creditLimit * 2;
-                    user.CreditLimit = creditLimit;
-                }
-            }
-            else
-            {
-                // Do credit check
-                user.HasCreditLimit = true;
-                using (var userCreditService = new UserCreditServiceClient())
-                {
-                    var creditLimit = userCreditService.GetCreditLimit(user.Firstname, user.Surname, user.DateOfBirth);
-                    user.CreditLimit = creditLimit;
+                    userAdded = _userRepository.Add(user);
                 }
             }
 
-            if (user.HasCreditLimit && user.CreditLimit < 500)
-            {
-                return false;
-            }
-            
-            UserDataAccess.AddUser(user);
-
-            return true;
+            return userAdded;
         }
     }
 }

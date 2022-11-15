@@ -2,6 +2,6 @@
 {
     public enum ClientStatus
     {
-        none = 0
+        None
     }
 }
